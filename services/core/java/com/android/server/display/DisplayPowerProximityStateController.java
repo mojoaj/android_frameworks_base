@@ -323,7 +323,14 @@ public final class DisplayPowerProximityStateController {
      */
     public void notifyDisplayDeviceChanged(DisplayDeviceConfig displayDeviceConfig) {
         this.mDisplayDeviceConfig = displayDeviceConfig;
+        final Sensor oldSensor = mProximitySensor;
         loadProximitySensor();
+        if (mProximitySensor != oldSensor) {
+            // The logical display moved to another panel with a different proximity
+            // sensor (e.g. a foldable unfolding during a call). Stop listening to the old
+            // sensor; the next power state update re-enables the new one if still needed.
+            setProximitySensorEnabled(false);
+        }
     }
 
     /**
