@@ -188,6 +188,9 @@ public class AutomaticBrightnessController {
 
     // The time when the light sensor was enabled.
     private long mLightSensorEnableTime;
+    // Same moment as mLightSensorEnableTime, but in the clock used for sensor events
+    // (elapsedRealtime), so it can be compared with sample times after the device slept.
+    private long mLightSensorEnableSensorTime;
 
     // The currently accepted nominal ambient light level.
     private float mAmbientLux = INVALID_LUX;
@@ -736,6 +739,7 @@ public class AutomaticBrightnessController {
             if (!mLightSensorEnabled) {
                 mLightSensorEnabled = true;
                 mLightSensorEnableTime = mClock.uptimeMillis();
+                mLightSensorEnableSensorTime = mClock.getSensorEventScaleTime();
                 mCurrentLightSensorRate = mInitialLightSensorRate;
                 registerForegroundAppUpdater();
                 mSensorManager.registerListener(mLightSensorListener, mLightSensor,
@@ -928,8 +932,10 @@ public class AutomaticBrightnessController {
         // If the light sensor was just turned on then immediately update our initial
         // estimate of the current ambient light level.
         if (!mAmbientLuxValid) {
+            // Sample times use the sensor event clock (elapsedRealtime), so the enable time
+            // must too; comparing with uptime made the warm-up a no-op after any deep sleep.
             final long timeWhenSensorWarmedUp =
-                mLightSensorWarmUpTimeConfig + mLightSensorEnableTime;
+                mLightSensorWarmUpTimeConfig + mLightSensorEnableSensorTime;
             if (time < timeWhenSensorWarmedUp) {
                 if (mLoggingEnabled) {
                     Slog.d(TAG, "updateAmbientLux: Sensor not ready yet: "
@@ -937,8 +943,15 @@ public class AutomaticBrightnessController {
                             + "timeWhenSensorWarmedUp=" + timeWhenSensorWarmedUp);
                 }
                 mHandler.sendEmptyMessageAtTime(MSG_UPDATE_AMBIENT_LUX,
-                        timeWhenSensorWarmedUp);
+                        convertToUptime(timeWhenSensorWarmedUp));
                 return;
+            }
+            if (mLightSensorWarmUpTimeConfig > 0) {
+                // Readings taken while the sensor warmed up are not trusted (e.g. a foldable
+                // whose sensor hub is still switching optics), so base the initial estimate
+                // only on what was seen from the end of the warm-up on. prune() keeps the
+                // newest earlier sample as the value at that point.
+                mAmbientLightRingBuffer.prune(timeWhenSensorWarmedUp);
             }
             setAmbientLux(calculateAmbientLux(time, mAmbientLightHorizonShort));
             mAmbientLuxValid = true;
