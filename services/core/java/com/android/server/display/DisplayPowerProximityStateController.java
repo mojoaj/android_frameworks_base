@@ -216,7 +216,13 @@ public final class DisplayPowerProximityStateController {
      * Returns true if the proximity sensor screen-off function is available.
      */
     public boolean isProximitySensorAvailable() {
-        return mProximitySensor != null;
+        // On a foldable the default display may sit on a panel without a proximity sensor
+        // while the other panel has one. Apps check proximity wake lock support once (e.g.
+        // when a call starts), so report it whenever the device has a proximity sensor; a
+        // panel without one simply never turns off for proximity.
+        return mProximitySensor != null
+                || (mDisplayId == Display.DEFAULT_DISPLAY
+                        && mSensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY) != null);
     }
 
     /**
