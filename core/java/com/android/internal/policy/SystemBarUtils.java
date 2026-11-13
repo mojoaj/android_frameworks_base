@@ -19,6 +19,7 @@ package com.android.internal.policy;
 import android.annotation.DimenRes;
 import android.annotation.NonNull;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Insets;
 import android.view.Display;
@@ -46,7 +47,10 @@ public final class SystemBarUtils {
      * Gets the status bar height with a specific display cutout.
      */
     public static int getStatusBarHeight(Resources res, DisplayCutout cutout) {
-        final int defaultSize = res.getDimensionPixelSize(R.dimen.status_bar_height_default);
+        final int defaultSize = res.getDimensionPixelSize(
+                res.getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE
+                        ? R.dimen.status_bar_height_landscape
+                        : R.dimen.status_bar_height_portrait);
         final int safeInsetTop = cutout == null ? 0 : cutout.getSafeInsetTop();
         final int waterfallInsetTop = cutout == null ? 0 : cutout.getWaterfallInsets().top;
         // The status bar height should be:
@@ -78,8 +82,14 @@ public final class SystemBarUtils {
             insets = Insets.of(rotated.getSafeInsets());
             waterfallInsets = rotated.getWaterfallInsets();
         }
-        final int defaultSize =
-                context.getResources().getDimensionPixelSize(R.dimen.status_bar_height_default);
+        // Use the portrait or landscape height for the target rotation (q6q: the cover
+        // screen's bar is taller in portrait to line the icons up with the camera hole).
+        final boolean naturalPortrait = (rotation == Surface.ROTATION_0
+                || rotation == Surface.ROTATION_180) == (localHeight >= localWidth);
+        final boolean targetLandscape = naturalPortrait
+                == (targetRot == Surface.ROTATION_90 || targetRot == Surface.ROTATION_270);
+        final int defaultSize = context.getResources().getDimensionPixelSize(targetLandscape
+                ? R.dimen.status_bar_height_landscape : R.dimen.status_bar_height_portrait);
         // The status bar height should be:
         // Max(top cutout size, (status bar default height + waterfall top size))
         return Math.max(insets.top, defaultSize + waterfallInsets.top);
