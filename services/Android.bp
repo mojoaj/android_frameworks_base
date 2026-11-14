@@ -393,6 +393,7 @@ java_library {
         "//frameworks/opt:__subpackages__",
         "//vendor:__subpackages__",
         "//lineage-sdk:__subpackages__",
+        "//device/samsung/q6q:__subpackages__",
     ],
 
     lint: {
