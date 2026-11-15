@@ -420,11 +420,16 @@ public class DividerView extends FrameLayout implements View.OnTouchListener {
             if (mResizeMenu != null && mResizeMenu.isShowing()) {
                 int btnSize = resources.getDimensionPixelSize(R.dimen.split_divider_button_size);
                 int gap = resources.getDimensionPixelSize(R.dimen.split_divider_button_margin);
+                // q6q: the layout toggle button sits along the divider past the handle, so
+                // grow the region along the divider axis too.
+                final int handleLen = resources.getDimensionPixelSize(
+                        R.dimen.split_divider_handle_width);
+                final int alongAxis = handleLen + 2 * (btnSize + gap);
                 if (mSplitLayout.isLeftRightSplit()) {
-                    height = Math.max(height, btnSize);
+                    height = Math.max(height, alongAxis);
                     width += 2 * (btnSize + gap);
                 } else {
-                    width = Math.max(width, btnSize);
+                    width = Math.max(width, alongAxis);
                     height += 2 * (btnSize + gap);
                 }
             }

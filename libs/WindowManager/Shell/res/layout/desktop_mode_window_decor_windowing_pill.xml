@@ -43,10 +43,10 @@
 
     <ImageButton
         android:id="@+id/floating_button"
-        android:contentDescription="@string/float_button_text"
-        android:src="@drawable/desktop_mode_ic_handle_menu_floating"
+        android:contentDescription="@string/close_text"
+        android:src="@drawable/desktop_mode_ic_handle_menu_close"
         android:tint="@color/materialColorOnSurface"
-        android:tooltipText="@string/float_button_text"
+        android:tooltipText="@string/close_text"
         style="@style/DesktopModeHandleMenuWindowingButton"
         app:layout_constraintStart_toEndOf="@id/split_screen_button"
         app:layout_constraintEnd_toStartOf="@id/desktop_button"

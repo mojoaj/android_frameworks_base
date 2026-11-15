@@ -246,7 +246,8 @@ class WindowingPillView(private val context: Context, attrs: AttributeSet) :
                 )
             }
             R.id.floating_button -> {
-                windowDecorationActions.onToFloat(taskInfo.taskId)
+                // q6q: this slot is a close button instead of "move to bubble".
+                windowDecorationActions.onClose(taskInfo)
             }
         }
         onPillItemClicked?.invoke()
@@ -259,9 +260,9 @@ class WindowingPillView(private val context: Context, attrs: AttributeSet) :
 
         background.setTint(style.backgroundColor)
 
-        if (!BubbleFlagHelper.enableBubbleToFullscreen() || taskInfo.isFreeform) {
-            floatingBtn.visibility = View.GONE
-        }
+        // q6q: the floating slot is a close button; desktop windows already have one in
+        // their header.
+        floatingBtn.visibility = if (taskInfo.isFreeform) View.GONE else View.VISIBLE
 
         if (!Flags.enableNonDefaultDisplaySplitBugfix() && taskInfo.displayId != DEFAULT_DISPLAY) {
             splitscreenBtn.visibility = View.GONE
@@ -276,8 +277,8 @@ class WindowingPillView(private val context: Context, attrs: AttributeSet) :
         splitscreenBtn.isSelected = isInSplitScreen
         splitscreenBtn.isEnabled = !isInSplitScreen
         splitscreenBtn.imageTintList = style.buttonColor
-        floatingBtn.isSelected = taskInfo.isPinned
-        floatingBtn.isEnabled = !taskInfo.isPinned
+        floatingBtn.isSelected = false
+        floatingBtn.isEnabled = true
         floatingBtn.imageTintList = style.buttonColor
         desktopBtn.isGone = !shouldShowDesktopModeButton
         desktopBtn.isSelected = taskInfo.isFreeform
