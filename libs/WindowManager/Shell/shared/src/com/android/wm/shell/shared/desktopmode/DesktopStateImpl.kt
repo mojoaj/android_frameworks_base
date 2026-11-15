@@ -106,7 +106,12 @@ class DesktopStateImpl(context: Context) : DesktopState {
     override fun isDesktopModeSupportedOnDisplay(display: Display): Boolean {
         if (!canEnterDesktopMode) return false
         if (!enforceDeviceRestrictions) return true
-        if (display.type == Display.TYPE_INTERNAL) return canInternalDisplayHostDesktops
+        if (display.type == Display.TYPE_INTERNAL) {
+            // q6q: on a foldable the same internal display is the small cover screen when
+            // folded; only host desktops while it is large (unfolded).
+            return canInternalDisplayHostDesktops &&
+                display.minSizeDimensionDp >= WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP
+        }
         if (!DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue) return false
         return windowManager?.isEligibleForDesktopMode(display.displayId) ?: false
     }

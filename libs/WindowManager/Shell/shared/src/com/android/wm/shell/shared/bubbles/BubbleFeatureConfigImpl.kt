@@ -36,7 +36,11 @@ class BubbleFeatureConfigImpl(
         if (!BubbleFlagHelper.enableCreateAnyBubble()) return false
 
         // Do not allow any app to be bubbled on a display that supports desktop windowing.
-        if (Flags.disableBubbleAnythingDesktopWindowing()) {
+        // q6q: except on internal displays (the foldable's inner screen hosts desktops but
+        // bubbles are still the quick "pop-up" floating window there).
+        val display = context.display
+        if (Flags.disableBubbleAnythingDesktopWindowing() &&
+            display?.type != android.view.Display.TYPE_INTERNAL) {
             val desktopSupported = desktopState.isDesktopModeSupportedOnDisplay(context.displayId)
             return !desktopSupported && BubbleFlagHelper.enableCreateAnyBubble()
         }
