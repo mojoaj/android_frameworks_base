@@ -929,6 +929,35 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
         mInteractionJankMonitor.cancel(CUJ_SPLIT_SCREEN_RESIZE);
     }
 
+    /** Whether the divider menu may offer switching between left/right and top/bottom. */
+    boolean canToggleSplitOrientation() {
+        return mIsLargeScreen && mContext.getDisplayId() == DEFAULT_DISPLAY
+                && mDividerFlingAnimator == null && !isCurrentlySwapping();
+    }
+
+    /**
+     * q6q: flips the split between left/right and top/bottom without rotating the display and
+     * remembers the choice (Settings.Global split_screen_layout) so it survives rotation.
+     */
+    void toggleSplitOrientation() {
+        if (!canToggleSplitOrientation()) return;
+        final boolean wasLeftRightSplit = mIsLeftRightSplit;
+        android.provider.Settings.Global.putInt(mContext.getContentResolver(),
+                SplitScreenUtils.SPLIT_LAYOUT_SETTING,
+                wasLeftRightSplit ? SplitScreenUtils.SPLIT_LAYOUT_TOP_BOTTOM
+                        : SplitScreenUtils.SPLIT_LAYOUT_LEFT_RIGHT);
+        mIsLeftRightSplit = !wasLeftRightSplit;
+        mStatusBarHider.onLeftRightSplitUpdated(mIsLeftRightSplit);
+        mTempRect.set(mRootBounds);
+        updateLayouts();
+        updateDividerConfig(mContext);
+        initDividerPosition(mTempRect, wasLeftRightSplit);
+        updateInvisibleRect();
+        // Resize the tasks, then re-create the divider window in the new orientation.
+        mSplitLayoutHandler.onLayoutSizeChanged(this);
+        update(null /* t */, false /* resetImePosition */);
+    }
+
     void onDoubleTappedDivider() {
         if (isCurrentlySwapping()) {
             return;
