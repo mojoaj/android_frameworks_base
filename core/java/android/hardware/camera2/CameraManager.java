@@ -2516,9 +2516,12 @@ public final class CameraManager {
                 List<String> cameraIds = new ArrayList<>();
                 boolean exposeAuxCamera = Camera.shouldExposeAuxCamera();
                 for (int i = 0; i < mDeviceStatus.size(); i++) {
-                    if (!exposeAuxCamera && i == 2) break;
+                    if (!exposeAuxCamera && i == 2 && Camera.getAuxCameraIdLimit() < 0) break;
                     int status = mDeviceStatus.valueAt(i);
                     DeviceCameraInfo info = mDeviceStatus.keyAt(i);
+                    if (!exposeAuxCamera && Camera.isAuxCameraId(info.mCameraId)) {
+                        continue;
+                    }
                     if (status == ICameraServiceListener.STATUS_NOT_PRESENT
                             || status == ICameraServiceListener.STATUS_ENUMERATING
                             || shouldHideCamera(deviceId, devicePolicy, info)) {
@@ -3118,7 +3121,9 @@ public final class CameraManager {
         }
 
         private void onStatusChangedLocked(int status, DeviceCameraInfo info) {
-            if (!Camera.shouldExposeAuxCamera() && Integer.parseInt(info.mCameraId) >= 2) {
+            if (!Camera.shouldExposeAuxCamera() && (Camera.getAuxCameraIdLimit() >= 0
+                    ? Camera.isAuxCameraId(info.mCameraId)
+                    : Integer.parseInt(info.mCameraId) >= 2)) {
                 Log.w(TAG, String.format("Ignoring status update of camera %d", info.mDeviceId));
                 return;
             }

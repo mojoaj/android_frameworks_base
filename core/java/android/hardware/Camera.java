@@ -272,6 +272,28 @@ public class Camera {
     private static final int CAMERA_FACE_DETECTION_SW = 1;
 
     /**
+     * Numeric camera IDs at or above vendor.camera.aux.idlimit (when set) are treated as aux
+     * cameras and hidden from apps outside vendor.camera.aux.packagelist, instead of
+     * exposing only the first two IDs. Samsung HALs list extra IDs (inner under-display
+     * camera, lens modes) that One UI hides from third-party apps.
+     * @hide
+     */
+    public static int getAuxCameraIdLimit() {
+        return SystemProperties.getInt("vendor.camera.aux.idlimit", -1);
+    }
+
+    /** @hide */
+    public static boolean isAuxCameraId(String cameraId) {
+        final int limit = getAuxCameraIdLimit();
+        if (limit < 0) return false;
+        try {
+            return Integer.parseInt(cameraId) >= limit;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /**
      * @hide
      */
     public static boolean shouldExposeAuxCamera() {
