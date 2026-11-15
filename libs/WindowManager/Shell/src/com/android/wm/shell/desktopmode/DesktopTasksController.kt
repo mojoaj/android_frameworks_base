@@ -2118,8 +2118,10 @@ class DesktopTasksController(
             logI("closeTask(taskId=%d): %s", taskId, CloseTaskResult.CLOSED_DESKTOP)
             return CloseTaskResult.CLOSED_DESKTOP
         }
-        // q6q: always allowed; the app handle menu's close button relies on it.
-        if (task.getWindowingMode() == WINDOWING_MODE_FULLSCREEN) {
+        if (
+            DesktopExperienceFlags.CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT.isTrue() &&
+                task.getWindowingMode() == WINDOWING_MODE_FULLSCREEN
+        ) {
             val wct = WindowContainerTransaction()
             wct.removeTask(task.token)
             transitions.startTransition(TRANSIT_CLOSE, wct, null)
