@@ -45,9 +45,13 @@ import android.hardware.fingerprint.FingerprintManager;
 import android.hardware.fingerprint.FingerprintSensorPropertiesInternal;
 import android.hardware.fingerprint.IUdfpsOverlayController;
 import android.os.IBinder;
+import android.os.PowerManager;
+import android.os.PowerManagerInternal;
 import android.os.RemoteException;
+import android.os.SystemClock;
 import android.util.Slog;
 
+import com.android.server.LocalServices;
 import com.android.server.biometrics.log.BiometricContext;
 import com.android.server.biometrics.log.BiometricLogger;
 import com.android.server.biometrics.log.CallbackWithProbe;
@@ -78,6 +82,12 @@ public class FingerprintAuthenticationClient
         extends AuthenticationClient<AidlSession, FingerprintAuthenticateOptions>
         implements Udfps, LockoutConsumer, PowerPressHandler {
     private static final String TAG = "FingerprintAuthenticationClient";
+
+    // Side-key sensors: the finger that pressed power to lock is still on the key when the
+    // keyguard starts listening, so it would unlock again at once. Pixel HALs report
+    // BIOMETRIC_ERROR_POWER_PRESSED for this; other HALs (Samsung) don't, so drop keyguard
+    // matches that land this soon after a power-button sleep. Keyguard retries on that error.
+    private static final long SIDEFPS_IGNORE_AFTER_POWER_SLEEP_MS = 1500;
     @NonNull
     private final SensorOverlays mSensorOverlays;
     @NonNull
@@ -176,6 +186,11 @@ public class FingerprintAuthenticationClient
             BiometricAuthenticator.Identifier identifier,
             boolean authenticated,
             ArrayList<Byte> token) {
+        if (authenticated && isMatchFromPowerSleepPress()) {
+            Slog.i(TAG, "Ignoring side-fps match right after power button sleep");
+            onError(BiometricFingerprintConstants.BIOMETRIC_ERROR_POWER_PRESSED, 0);
+            return;
+        }
         super.onAuthenticated(identifier, authenticated, token);
         handleLockout(authenticated);
         if (authenticated) {
@@ -195,6 +210,22 @@ public class FingerprintAuthenticationClient
                     getTargetUserId()).build()
             );
         }
+    }
+
+    private boolean isMatchFromPowerSleepPress() {
+        if (!mSensorProps.isAnySidefpsType() || !isKeyguard()) {
+            return false;
+        }
+        final PowerManager pm = getContext().getSystemService(PowerManager.class);
+        final PowerManagerInternal pmi = LocalServices.getService(PowerManagerInternal.class);
+        if (pm == null || pmi == null || pm.isInteractive()) {
+            return false;
+        }
+        final PowerManager.SleepData sleep = pmi.getLastGoToSleep();
+        return sleep != null
+                && sleep.goToSleepReason == PowerManager.GO_TO_SLEEP_REASON_POWER_BUTTON
+                && SystemClock.uptimeMillis() - sleep.goToSleepUptimeMillis
+                        < SIDEFPS_IGNORE_AFTER_POWER_SLEEP_MS;
     }
 
     private void handleLockout(boolean authenticated) {
