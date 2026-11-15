@@ -88,6 +88,20 @@ public class FingerprintAuthenticationClient
     // BIOMETRIC_ERROR_POWER_PRESSED for this; other HALs (Samsung) don't, so drop keyguard
     // matches that land this soon after a power-button sleep. Keyguard retries on that error.
     private static final long SIDEFPS_IGNORE_AFTER_POWER_SLEEP_MS = 1500;
+    // HALs that report finger-leave (Samsung SEM_FINGERPRINT_EVENT_FINGER_LEAVE, forwarded as
+    // AcquiredInfo.VENDOR) let us wait for the finger to lift instead of using the delay above.
+    // The cap only guards against a lost event.
+    public static final int VENDOR_FINGER_LEAVE = 10004;
+    private static final long SIDEFPS_MAX_WAIT_FOR_LIFT_MS = 10000;
+    private static volatile boolean sFingerLeaveSupported;
+    private static volatile long sLastFingerLeaveUptime;
+
+    /** Called when the HAL reports that the finger left the sensor. */
+    public static void onFingerLeave() {
+        sFingerLeaveSupported = true;
+        sLastFingerLeaveUptime = SystemClock.uptimeMillis();
+        Slog.d(TAG, "Finger left the sensor");
+    }
     @NonNull
     private final SensorOverlays mSensorOverlays;
     @NonNull
@@ -222,10 +236,17 @@ public class FingerprintAuthenticationClient
             return false;
         }
         final PowerManager.SleepData sleep = pmi.getLastGoToSleep();
-        return sleep != null
-                && sleep.goToSleepReason == PowerManager.GO_TO_SLEEP_REASON_POWER_BUTTON
-                && SystemClock.uptimeMillis() - sleep.goToSleepUptimeMillis
-                        < SIDEFPS_IGNORE_AFTER_POWER_SLEEP_MS;
+        if (sleep == null
+                || sleep.goToSleepReason != PowerManager.GO_TO_SLEEP_REASON_POWER_BUTTON) {
+            return false;
+        }
+        final long sinceSleep = SystemClock.uptimeMillis() - sleep.goToSleepUptimeMillis;
+        if (sFingerLeaveSupported) {
+            // Ignore matches until the finger that pressed power has lifted off the key.
+            return sLastFingerLeaveUptime < sleep.goToSleepUptimeMillis
+                    && sinceSleep < SIDEFPS_MAX_WAIT_FOR_LIFT_MS;
+        }
+        return sinceSleep < SIDEFPS_IGNORE_AFTER_POWER_SLEEP_MS;
     }
 
     private void handleLockout(boolean authenticated) {

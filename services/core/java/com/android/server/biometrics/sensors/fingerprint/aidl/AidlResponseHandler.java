@@ -133,6 +133,12 @@ public class AidlResponseHandler extends ISessionCallback.Stub {
 
     @Override
     public void onAcquired(byte info, int vendorCode) {
+        if (info == android.hardware.biometrics.fingerprint.AcquiredInfo.VENDOR
+                && vendorCode == FingerprintAuthenticationClient.VENDOR_FINGER_LEAVE) {
+            // q6q: Samsung HAL finger-leave event; record it, don't show it to clients.
+            FingerprintAuthenticationClient.onFingerLeave();
+            return;
+        }
         handleResponse(AcquisitionClient.class, (c) -> c.onAcquired(
                 AidlConversionUtils.toFrameworkAcquiredInfo(info), vendorCode));
     }

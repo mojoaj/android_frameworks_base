@@ -34,6 +34,7 @@ import com.android.wm.shell.shared.bubbles.BubbleFlagHelper
 class DesktopStateImpl(context: Context) : DesktopState {
 
     private val windowManager = context.getSystemService(WindowManager::class.java)
+    private val contentResolver = context.contentResolver
     private val displayManager = context.getSystemService(DisplayManager::class.java)
 
     private val projectedModeState by lazy { ProjectedModeState(context, this) }
@@ -113,8 +114,7 @@ class DesktopStateImpl(context: Context) : DesktopState {
             return canInternalDisplayHostDesktops &&
                 display.minSizeDimensionDp >=
                     WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP &&
-                Settings.Global.getInt(
-                    context.contentResolver, INNER_DESKTOP_WINDOWS_SETTING, 0) != 0
+                Settings.Global.getInt(contentResolver, INNER_DESKTOP_WINDOWS_SETTING, 0) != 0
         }
         if (!DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue) return false
         return windowManager?.isEligibleForDesktopMode(display.displayId) ?: false
