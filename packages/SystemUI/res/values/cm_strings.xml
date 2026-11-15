@@ -73,8 +73,6 @@
 
     <!-- Heads up QS tile -->
     <string name="quick_settings_heads_up_label">Heads up</string>
-    <!-- q6q: Quick Settings tile that enables desktop windows on the inner screen [CHAR LIMIT=NONE] -->
-    <string name="quick_settings_desktop_windows_label">Desktop windows</string>
     <string name="accessibility_quick_settings_heads_up_off">Heads up off.</string>
     <string name="accessibility_quick_settings_heads_up_on">Heads up on.</string>
 

@@ -37,12 +37,6 @@ class DividerResizeMenu(context: Context) : FrameLayout(context) {
 
     @VisibleForTesting val nextButton: ImageView = ImageView(context)
 
-    /** q6q: switches the split between left/right and top/bottom. */
-    @VisibleForTesting val layoutButton: ImageView = ImageView(context)
-
-    private val showLayoutButton: Boolean
-        get() = mSplitLayout?.canToggleSplitOrientation() == true
-
     /** @return `true` if the menu is currently visible or animating in. */
     var isShowing: Boolean = false
         private set
@@ -57,18 +51,13 @@ class DividerResizeMenu(context: Context) : FrameLayout(context) {
     init {
         setupButton(prevButton)
         setupButton(nextButton)
-        setupButton(layoutButton)
         addView(prevButton)
         addView(nextButton)
-        addView(layoutButton)
-        layoutButton.setImageResource(R.drawable.split_ic_divider_menu_layout)
-        layoutButton.contentDescription = "Switch split layout"
         clipChildren = false
         clipToPadding = false
 
         prevButton.setOnClickListener { snapToPrev() }
         nextButton.setOnClickListener { snapToNext() }
-        layoutButton.setOnClickListener { toggleLayout() }
     }
 
     /**
@@ -83,7 +72,6 @@ class DividerResizeMenu(context: Context) : FrameLayout(context) {
         mButtonGap = resources.getDimensionPixelSize(R.dimen.split_divider_button_margin)
         updateButtonSize(prevButton)
         updateButtonSize(nextButton)
-        updateButtonSize(layoutButton)
     }
 
     private fun setupButton(button: ImageView) {
@@ -121,7 +109,6 @@ class DividerResizeMenu(context: Context) : FrameLayout(context) {
         set.playTogether(
             ObjectAnimator.ofFloat(prevButton, ALPHA, 1f),
             ObjectAnimator.ofFloat(nextButton, ALPHA, 1f),
-            ObjectAnimator.ofFloat(layoutButton, ALPHA, if (showLayoutButton) 1f else 0f),
         )
         set.setDuration(TOUCH_ANIMATION_DURATION)
         set.addListener(
@@ -130,10 +117,8 @@ class DividerResizeMenu(context: Context) : FrameLayout(context) {
                     isShowing = true
                     prevButton.visibility = VISIBLE
                     nextButton.visibility = VISIBLE
-                    layoutButton.visibility = if (showLayoutButton) VISIBLE else GONE
                     prevButton.alpha = 0f
                     nextButton.alpha = 0f
-                    layoutButton.alpha = 0f
                     mVisibilityCallback?.invoke()
                     resetHideTimer()
                 }
@@ -152,7 +137,6 @@ class DividerResizeMenu(context: Context) : FrameLayout(context) {
         set.playTogether(
             ObjectAnimator.ofFloat(prevButton, ALPHA, 0f),
             ObjectAnimator.ofFloat(nextButton, ALPHA, 0f),
-            ObjectAnimator.ofFloat(layoutButton, ALPHA, 0f),
         )
         set.setDuration(TOUCH_ANIMATION_DURATION)
         set.addListener(
@@ -160,7 +144,6 @@ class DividerResizeMenu(context: Context) : FrameLayout(context) {
                 override fun onAnimationEnd(animation: Animator) {
                     prevButton.visibility = GONE
                     nextButton.visibility = GONE
-                    layoutButton.visibility = GONE
                     isShowing = false
                     mVisibilityCallback?.invoke()
                 }
@@ -202,22 +185,12 @@ class DividerResizeMenu(context: Context) : FrameLayout(context) {
             prevButton.translationY = 0f
             nextButton.translationX = handleWidth / 2f + mButtonSize / 2f + mButtonGap
             nextButton.translationY = 0f
-            // Layout button sits on the divider, below the handle. Glyph shows the target
-            // layout (top/bottom).
-            layoutButton.translationX = 0f
-            layoutButton.translationY = handleHeight / 2f + mButtonSize / 2f + mButtonGap
-            layoutButton.rotation = 90f
         } else {
             // Horizontal divider: place buttons above and below the handle
             prevButton.translationX = 0f
             prevButton.translationY = -handleHeight / 2f - mButtonSize / 2f - mButtonGap
             nextButton.translationX = 0f
             nextButton.translationY = handleHeight / 2f + mButtonSize / 2f + mButtonGap
-            // Layout button sits on the divider, right of the handle. Glyph shows the target
-            // layout (side by side).
-            layoutButton.translationX = handleWidth / 2f + mButtonSize / 2f + mButtonGap
-            layoutButton.translationY = 0f
-            layoutButton.rotation = 0f
         }
     }
 
@@ -255,20 +228,6 @@ class DividerResizeMenu(context: Context) : FrameLayout(context) {
         layout.snapToTarget(position, target)
     }
 
-    /** q6q: flips the split orientation (left/right <-> top/bottom). */
-    private fun toggleLayout() {
-        val layout = mSplitLayout ?: return
-        ProtoLog.d(ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN, "DividerResizeMenu: Toggle layout")
-        removeCallbacks(mHideRunnable)
-        // Hide immediately; the divider window is re-created in the new orientation.
-        prevButton.visibility = GONE
-        nextButton.visibility = GONE
-        layoutButton.visibility = GONE
-        isShowing = false
-        mVisibilityCallback?.invoke()
-        layout.toggleSplitOrientation()
-    }
-
     /** Snaps the divider to the next valid split target (e.g., right or bottom). */
     private fun snapToNext() {
         resetHideTimer()
@@ -288,8 +247,7 @@ class DividerResizeMenu(context: Context) : FrameLayout(context) {
      */
     fun isTouchInside(x: Float, y: Float): Boolean {
         if (!isShowing) return false
-        return isTouchInView(prevButton, x, y) || isTouchInView(nextButton, x, y) ||
-            isTouchInView(layoutButton, x, y)
+        return isTouchInView(prevButton, x, y) || isTouchInView(nextButton, x, y)
     }
 
     private fun isTouchInView(view: View?, x: Float, y: Float): Boolean {

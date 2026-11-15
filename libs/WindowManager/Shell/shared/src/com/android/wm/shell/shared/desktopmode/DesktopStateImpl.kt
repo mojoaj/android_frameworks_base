@@ -34,7 +34,6 @@ import com.android.wm.shell.shared.bubbles.BubbleFlagHelper
 class DesktopStateImpl(context: Context) : DesktopState {
 
     private val windowManager = context.getSystemService(WindowManager::class.java)
-    private val contentResolver = context.contentResolver
     private val displayManager = context.getSystemService(DisplayManager::class.java)
 
     private val projectedModeState by lazy { ProjectedModeState(context, this) }
@@ -107,15 +106,7 @@ class DesktopStateImpl(context: Context) : DesktopState {
     override fun isDesktopModeSupportedOnDisplay(display: Display): Boolean {
         if (!canEnterDesktopMode) return false
         if (!enforceDeviceRestrictions) return true
-        if (display.type == Display.TYPE_INTERNAL) {
-            // q6q: on a foldable the same internal display is the small cover screen when
-            // folded; only host desktops while it is large (unfolded).
-            // Also gated by the user's Quick Settings tile (INNER_DESKTOP_WINDOWS_SETTING).
-            return canInternalDisplayHostDesktops &&
-                display.minSizeDimensionDp >=
-                    WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP &&
-                Settings.Global.getInt(contentResolver, INNER_DESKTOP_WINDOWS_SETTING, 0) != 0
-        }
+        if (display.type == Display.TYPE_INTERNAL) return canInternalDisplayHostDesktops
         if (!DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue) return false
         return windowManager?.isEligibleForDesktopMode(display.displayId) ?: false
     }
@@ -158,12 +149,6 @@ class DesktopStateImpl(context: Context) : DesktopState {
 
     companion object {
         @VisibleForTesting
-        /**
-         * q6q: Settings.Global switch (Quick Settings tile) that lets the large internal display
-         * host desktop windows. 0 = off (default), 1 = on.
-         */
-        const val INNER_DESKTOP_WINDOWS_SETTING = "inner_screen_desktop_windows"
-
         const val ENFORCE_DEVICE_RESTRICTIONS_SYS_PROP =
             "persist.wm.debug.desktop_mode_enforce_device_restrictions"
 

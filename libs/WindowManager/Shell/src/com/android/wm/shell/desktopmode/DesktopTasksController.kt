@@ -421,20 +421,6 @@ class DesktopTasksController(
         // Update the current user id again because it might be updated between init and onInit().
         updateCurrentUser(ActivityManager.getCurrentUser())
         desktopFullscreenRequestHandler.desktopTasksController = this
-        // q6q: when the inner-screen desktop windows tile is turned off, move every window in
-        // the default display's desks back to fullscreen (removing a desk would close them).
-        context.contentResolver.registerContentObserver(
-            android.provider.Settings.Global.getUriFor(
-                com.android.wm.shell.shared.desktopmode.DesktopStateImpl
-                    .INNER_DESKTOP_WINDOWS_SETTING
-            ),
-            false,
-            object : android.database.ContentObserver(null) {
-                override fun onChange(selfChange: Boolean) {
-                    mainExecutor.execute { onInnerDesktopWindowsSettingChanged() }
-                }
-            },
-        )
         dragToDesktopTransitionHandler.dragToDesktopStateListener = dragToDesktopStateListener
         recentsTransitionHandler.addTransitionStateListener(
             object : RecentsTransitionStateListener {
@@ -5954,26 +5940,6 @@ class DesktopTasksController(
             skipWallpaperAndHomeOrdering = skipWallpaperAndHomeOrdering,
             removeTasks = removeTasks,
         )
-    }
-
-    private fun onInnerDesktopWindowsSettingChanged() {
-        val enabled =
-            android.provider.Settings.Global.getInt(
-                context.contentResolver,
-                com.android.wm.shell.shared.desktopmode.DesktopStateImpl
-                    .INNER_DESKTOP_WINDOWS_SETTING,
-                0,
-            ) != 0
-        logV("onInnerDesktopWindowsSettingChanged enabled=%b", enabled)
-        if (enabled) return
-        val repository = userRepositories.current
-        repository
-            .getAllDeskIds()
-            .filter { deskId -> repository.getDisplayForDesk(deskId) == DEFAULT_DISPLAY }
-            .flatMap { deskId -> repository.getActiveTaskIdsInDesk(deskId) }
-            .forEach { taskId ->
-                moveToFullscreen(taskId, DesktopModeTransitionSource.UNKNOWN)
-            }
     }
 
     /** Removes all the available desks on all displays. */

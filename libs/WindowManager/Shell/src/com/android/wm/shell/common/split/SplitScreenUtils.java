@@ -34,13 +34,10 @@ import static com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSIT
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
-import android.app.ActivityThread;
-import android.app.Application;
 import android.app.TaskInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Rect;
-import android.provider.Settings;
 import android.window.DesktopExperienceFlags;
 import android.window.DisplayAreaInfo;
 import android.window.WindowContainerToken;
@@ -158,23 +155,6 @@ public class SplitScreenUtils {
     }
 
     /**
-     * Settings.Global key that pins the split layout on large internal screens regardless of
-     * rotation: 0 = follow rotation (default), 1 = always left/right, 2 = always top/bottom.
-     */
-    public static final String SPLIT_LAYOUT_SETTING = "split_screen_layout";
-    public static final int SPLIT_LAYOUT_AUTO = 0;
-    public static final int SPLIT_LAYOUT_LEFT_RIGHT = 1;
-    public static final int SPLIT_LAYOUT_TOP_BOTTOM = 2;
-
-    /** Returns the user's split layout override, see {@link #SPLIT_LAYOUT_SETTING}. */
-    public static int getSplitLayoutOverride() {
-        final Application app = ActivityThread.currentApplication();
-        if (app == null) return SPLIT_LAYOUT_AUTO;
-        return Settings.Global.getInt(app.getContentResolver(), SPLIT_LAYOUT_SETTING,
-                SPLIT_LAYOUT_AUTO);
-    }
-
-    /**
      * Returns whether left/right split is supported in the given configuration.
      */
     public static boolean isLeftRightSplit(boolean allowLeftRightSplitInPortrait,
@@ -193,11 +173,6 @@ public class SplitScreenUtils {
      */
     public static boolean isLeftRightSplit(boolean allowLeftRightSplitInPortrait,
             boolean isLargeScreen, boolean isLandscape, int displayId) {
-        if (isLargeScreen && displayId == DEFAULT_DISPLAY) {
-            final int layout = getSplitLayoutOverride();
-            if (layout == SPLIT_LAYOUT_LEFT_RIGHT) return true;
-            if (layout == SPLIT_LAYOUT_TOP_BOTTOM) return false;
-        }
         if (allowLeftRightSplitInPortrait && isLargeScreen) {
             if (displayId == DEFAULT_DISPLAY
                     || !DesktopExperienceFlags.ENABLE_NON_DEFAULT_DISPLAY_SPLIT_BUGFIX.isTrue()) {

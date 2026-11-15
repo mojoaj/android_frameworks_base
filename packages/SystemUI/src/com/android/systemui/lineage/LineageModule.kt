@@ -23,7 +23,6 @@ import com.android.systemui.qs.tileimpl.QSTileImpl
 import com.android.systemui.qs.tiles.AmbientDisplayTile
 import com.android.systemui.qs.tiles.AODTile
 import com.android.systemui.qs.tiles.CaffeineTile
-import com.android.systemui.qs.tiles.DesktopWindowsTile
 import com.android.systemui.qs.tiles.HeadsUpTile
 import com.android.systemui.qs.tiles.PowerShareTile
 import com.android.systemui.qs.tiles.ProfilesTile
@@ -60,12 +59,6 @@ interface LineageModule {
     @IntoMap
     @StringKey(CaffeineTile.TILE_SPEC)
     fun bindCaffeineTile(caffeineTile: CaffeineTile): QSTileImpl<*>
-
-    /** Inject DesktopWindowsTile into tileMap in QSModule */
-    @Binds
-    @IntoMap
-    @StringKey(DesktopWindowsTile.TILE_SPEC)
-    fun bindDesktopWindowsTile(desktopWindowsTile: DesktopWindowsTile): QSTileImpl<*>
 
     /** Inject HeadsUpTile into tileMap in QSModule */
     @Binds
@@ -113,7 +106,6 @@ interface LineageModule {
         const val AMBIENT_DISPLAY_TILE_SPEC = "ambient_display"
         const val AOD_TILE_SPEC = "aod"
         const val CAFFEINE_TILE_SPEC = "caffeine"
-        const val DESKTOP_WINDOWS_TILE_SPEC = "desktop_windows"
         const val HEADS_UP_TILE_SPEC = "heads_up"
         const val POWERSHARE_TILE_SPEC = "powershare"
         const val PROFILES_TILE_SPEC = "profiles"
@@ -162,21 +154,6 @@ interface LineageModule {
                     QSTileUIConfig.Resource(
                         iconRes = R.drawable.ic_qs_caffeine,
                         labelRes = R.string.quick_settings_caffeine_label
-                    ),
-                instanceId = uiEventLogger.getNewInstanceId(),
-                category = TileCategory.DISPLAY,
-            )
-
-        @Provides
-        @IntoMap
-        @StringKey(DESKTOP_WINDOWS_TILE_SPEC)
-        fun provideDesktopWindowsTileConfig(uiEventLogger: QsEventLogger): QSTileConfig =
-            QSTileConfig(
-                tileSpec = TileSpec.create(DESKTOP_WINDOWS_TILE_SPEC),
-                uiConfig =
-                    QSTileUIConfig.Resource(
-                        iconRes = R.drawable.ic_qs_desktop_windows,
-                        labelRes = R.string.quick_settings_desktop_windows_label
                     ),
                 instanceId = uiEventLogger.getNewInstanceId(),
                 category = TileCategory.DISPLAY,
