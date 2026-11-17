@@ -445,16 +445,20 @@ public final class DisplayManagerService extends SystemService {
                     if (stateChanged) {
                         final int size = mDisplayStates.size();
                         for (int i = 0; i < size; i++) {
-                            // Only the device's own displays (default display group) count.
-                            // A projection display in its own group (e.g. wireless Android
-                            // Auto) kept the power HAL in INTERACTIVE with the phone's
-                            // screens off, so the touch panels never entered their
-                            // low-power gesture mode and double tap to wake stopped working.
-                            final int groupId = mLogicalDisplayMapper
-                                    .getDisplayGroupIdFromDisplayIdLocked(mDisplayStates.keyAt(i));
-                            if (groupId != Display.DEFAULT_DISPLAY_GROUP
-                                    && groupId != Display.INVALID_DISPLAY_GROUP) {
-                                continue;
+                            // Only the device's own panels count. Projection displays
+                            // (wireless Android Auto puts virtual displays both in its own
+                            // group and in the default group) kept the power HAL in
+                            // INTERACTIVE with the phone's screens off, so the touch panels
+                            // never entered their low-power gesture mode and double tap to
+                            // wake stopped working.
+                            final LogicalDisplay ld =
+                                    mLogicalDisplayMapper.getDisplayLocked(mDisplayStates.keyAt(i));
+                            if (ld != null) {
+                                final int type = ld.getDisplayInfoLocked().type;
+                                if (type != Display.TYPE_INTERNAL
+                                        && type != Display.TYPE_EXTERNAL) {
+                                    continue;
+                                }
                             }
                             final int displayState = i == index ? state : mDisplayStates.valueAt(i);
                             if (displayState != Display.STATE_OFF) {
