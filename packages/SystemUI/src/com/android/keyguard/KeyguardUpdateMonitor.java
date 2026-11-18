@@ -48,6 +48,7 @@ import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STR
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_BIOMETRIC_AUTH_REQUIRED_FOR_SECURE_LOCK_DEVICE;
 import static com.android.systemui.Flags.glanceableHubV2;
 import static com.android.systemui.Flags.simPinBouncerReset;
+import static com.android.systemui.statusbar.policy.DevicePostureController.DEVICE_POSTURE_CLOSED;
 import static com.android.systemui.statusbar.policy.DevicePostureController.DEVICE_POSTURE_OPENED;
 
 import android.annotation.AnyThread;
@@ -67,6 +68,10 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.pm.UserInfo;
 import android.database.ContentObserver;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.hardware.SensorPrivacyManager;
 import android.hardware.biometrics.BiometricAuthenticator;
 import android.hardware.biometrics.BiometricFingerprintConstants;
@@ -118,6 +123,8 @@ import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.logging.InstanceId;
 import com.android.internal.logging.UiEventLogger;
 import com.android.internal.util.LatencyTracker;
+
+import lineageos.providers.LineageSettings;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.keyguard.logging.KeyguardUpdateMonitorLogger;
 import com.android.keyguard.logging.SimLogger;
@@ -387,6 +394,32 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     private final Executor mBackgroundExecutor;
     private final Executor mMainExecutor;
     private final SensorPrivacyManager mSensorPrivacyManager;
+
+    // Pocket check: while the screen is off and the device is folded, a near proximity
+    // reading stops screen-off fingerprint auth (side key touched in a pocket). Follows
+    // Lineage's "Prevent accidental wake-up" (PROXIMITY_ON_WAKE) setting.
+    private static final float POCKET_NEAR_THRESHOLD = 5.0f;
+    private SensorManager mPocketSensorManager;
+    private Sensor mPocketSensor;
+    private boolean mPocketListening;
+    private boolean mInPocket;
+    private final SensorEventListener mPocketListener = new SensorEventListener() {
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+            final float distance = event.values[0];
+            final boolean near = distance < POCKET_NEAR_THRESHOLD
+                    && distance < mPocketSensor.getMaximumRange();
+            if (near != mInPocket) {
+                mInPocket = near;
+                mLogger.d(near ? "Pocket: near, fingerprint paused" : "Pocket: far");
+                updateFingerprintListeningState(BIOMETRIC_ACTION_UPDATE);
+            }
+        }
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        }
+    };
     private final ActiveUnlockConfig mActiveUnlockConfig;
     private final IDreamManager mDreamManager;
     private final DreamOverlayCallbackController mDreamOverlayCallbackController;
@@ -1947,6 +1980,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
             new DevicePostureController.Callback() {
                 @Override
                 public void onPostureChanged(@DevicePostureInt int posture) {
+                    updatePocketListening();
                     if (posture == DEVICE_POSTURE_OPENED) {
                         mLogger.d("Posture changed to open - attempting to request active"
                                 + " unlock and run face auth");
@@ -2109,6 +2143,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
         Trace.beginSection("KeyguardUpdateMonitor#handleStartedWakingUp");
         Assert.isMainThread();
 
+        updatePocketListening();
         updateFingerprintListeningState(BIOMETRIC_ACTION_UPDATE);
         requestActiveUnlockFromWakeReason(pmWakeReason, true);
 
@@ -2149,7 +2184,33 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
                 cb.onFinishedGoingToSleep(arg1);
             }
         }
+        updatePocketListening();
         updateFingerprintListeningState(BIOMETRIC_ACTION_UPDATE);
+    }
+
+    private void updatePocketListening() {
+        final int user = mSelectedUserInteractor.getSelectedUserId();
+        final boolean want = mPocketSensor != null
+                && !mDeviceInteractive
+                && mDevicePostureController.getDevicePosture() == DEVICE_POSTURE_CLOSED
+                && mFingerprintInteractiveToAuthProvider != null
+                && !mFingerprintInteractiveToAuthProvider.isEnabled(user)
+                && LineageSettings.System.getIntForUser(mContext.getContentResolver(),
+                        LineageSettings.System.PROXIMITY_ON_WAKE,
+                        mContext.getResources().getBoolean(org.lineageos.platform.internal.R.bool
+                                .config_proximityCheckOnWakeEnabledByDefault) ? 1 : 0,
+                        UserHandle.USER_CURRENT) == 1;
+        if (want && !mPocketListening) {
+            mPocketListening = mPocketSensorManager.registerListener(mPocketListener,
+                    mPocketSensor, SensorManager.SENSOR_DELAY_NORMAL, mHandler);
+        } else if (!want && mPocketListening) {
+            mPocketSensorManager.unregisterListener(mPocketListener);
+            mPocketListening = false;
+            if (mInPocket) {
+                mInPocket = false;
+                updateFingerprintListeningState(BIOMETRIC_ACTION_UPDATE);
+            }
+        }
     }
 
     private void handleScreenTurnedOff() {
@@ -2286,6 +2347,11 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
         mAuthController = authController;
         dumpManager.registerDumpable(this);
         mSensorPrivacyManager = sensorPrivacyManager;
+        mPocketSensorManager = context.getSystemService(SensorManager.class);
+        if (mPocketSensorManager != null && context.getResources().getBoolean(
+                org.lineageos.platform.internal.R.bool.config_proximityCheckOnWake)) {
+            mPocketSensor = mPocketSensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
+        }
         mActiveUnlockConfig = activeUnlockConfiguration;
         mLogger = logger;
         mSimLogger = simLogger;
@@ -3150,9 +3216,11 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
                 || !mFingerprintInteractiveToAuthProvider.isEnabled(user)
                 || (isDeviceInteractive() && !mGoingToSleep);
 
+        final boolean pocketBlocksFps = !isUdfps && mInPocket && !mDeviceInteractive;
+
         boolean shouldListen = shouldListenKeyguardState && shouldListenUserState
                 && shouldListenBouncerState && shouldListenUdfpsState && !mBiometricPromptShowing
-                && shouldListenSecureLockDeviceState && shouldListenFpsState;
+                && shouldListenSecureLockDeviceState && shouldListenFpsState && !pocketBlocksFps;
         logListenerModelData(
                 new KeyguardFingerprintListenModel(
                     System.currentTimeMillis(),

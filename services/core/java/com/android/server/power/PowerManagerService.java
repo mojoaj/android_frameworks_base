@@ -139,6 +139,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.display.BrightnessSynchronizer;
 import com.android.internal.os.BackgroundThread;
+import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.DumpUtils;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.util.LatencyTracker;
@@ -1300,6 +1301,10 @@ public final class PowerManagerService extends SystemService
     private Sensor mProximitySensor;
     private SensorEventListener mProximityListener;
     private PowerManager.WakeLock mProximityWakeLock;
+    // Foldables: the proximity sensor sits on the outside of one half, so it reads near
+    // when the unfolded device lies face up on a table. Only check while folded.
+    private int[] mFoldedDeviceStates = new int[0];
+    private volatile boolean mDeviceFoldedForProximity = true;
 
     public PowerManagerService(Context context) {
         this(context, new Injector());
@@ -1759,6 +1764,8 @@ public final class PowerManagerService extends SystemService
                 org.lineageos.platform.internal.R.bool.config_proximityCheckOnWakeEnabledByDefault);
         mProximityTimeOut = resources.getInteger(
                 org.lineageos.platform.internal.R.integer.config_proximityCheckTimeout);
+        mFoldedDeviceStates = resources.getIntArray(
+                com.android.internal.R.array.config_foldedDeviceStates);
         if (mProximityWakeSupported) {
             mProximityWakeLock = mContext.getSystemService(PowerManager.class)
                     .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ProximityWakeLock");
@@ -8461,6 +8468,7 @@ public final class PowerManagerService extends SystemService
         @Override
         public void onDeviceStateChanged(@NonNull DeviceState deviceState) {
             int stateIdentifier = deviceState.getIdentifier();
+            mDeviceFoldedForProximity = ArrayUtils.contains(mFoldedDeviceStates, stateIdentifier);
             if (mDeviceState != stateIdentifier) {
                 mDeviceState = stateIdentifier;
 
@@ -8579,8 +8587,11 @@ public final class PowerManagerService extends SystemService
         final TelephonyManager tm = mContext.getSystemService(TelephonyManager.class);
         final boolean hasIncomingCall = tm.getCallState() == TelephonyManager.CALL_STATE_RINGING;
 
+        final boolean foldedOrNotFoldable =
+                mFoldedDeviceStates.length == 0 || mDeviceFoldedForProximity;
+
         if (mProximityWakeSupported && mProximityWakeEnabled
-                && mProximitySensor != null && !hasIncomingCall) {
+                && mProximitySensor != null && !hasIncomingCall && foldedOrNotFoldable) {
             final Message msg = mHandler.obtainMessage(MSG_WAKE_UP);
             msg.obj = r;
             mHandler.sendMessageDelayed(msg, mProximityTimeOut);
